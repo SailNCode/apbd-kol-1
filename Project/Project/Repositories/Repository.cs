@@ -6,61 +6,77 @@ using Tutorial9.Services;
 
 namespace Tutorial9.Repositories;
 
-public class WarehouseRepository: TransactionalRepository, IWarehouseRepository
+public class Repository: TransactionalRepository, IRepository
 {
 
-    public WarehouseRepository(IConfiguration configuration): base(configuration) {}
-
-
-    public async Task<bool> IsProductPresent(int productId)
+    public Repository(IConfiguration configuration): base(configuration) {}
+    //Is present
+    //ToRemove
+    public async Task<bool> IsVisitPresent(int visitId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        await using var cmd = new SqlCommand("Select 1 FROM Product WHERE IdProduct = @productId", con);
+        await using var cmd = new SqlCommand("Select 1 FROM [Visit] WHERE visit_id = @visitId", con);
 
-        cmd.Parameters.AddWithValue("@productId", productId);
+        cmd.Parameters.AddWithValue("@visitId", visitId);
 
         await con.OpenAsync();
         SqlDataReader reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync();
     }
-    
-
-    public async Task<int> GetOrderId(int productId, int amount)
+    //Get object
+    //ToRemove
+    public async Task<ClientDTO> GetClient(int clientId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        await using var cmd = new SqlCommand("Select IdOrder FROM [Order] WHERE IdProduct = @productId AND Amount = @amount", con);
+        await using var cmd = new SqlCommand("SELECT * FROM [ClientA] WHERE client_id = @clientId", con);
 
-        cmd.Parameters.AddWithValue("@productId", productId);
-        cmd.Parameters.AddWithValue("@amount", amount);
+        cmd.Parameters.AddWithValue("@clientId", clientId);
 
         await con.OpenAsync();
         SqlDataReader reader = await cmd.ExecuteReaderAsync();
+
         if (await reader.ReadAsync())
         {
-            return (int)reader["IdOrder"];
+            return new ClientDTO
+            {
+                FirstName = reader["first_name"].ToString(),
+                LastName = reader["last_name"].ToString(),
+                DateOfBirth = (DateTime) reader["date_of_birth"]
+            };
         }
-        throw new NotFoundException("There is not such order with specific id and amount");
+
+        throw new NotFoundException("Client with such id doesn't exist");
     }
-    public async Task<Product> GetProduct(int productId)
+    //Get list
+    //ToRemove
+    public async Task<List<VisitServiceDTO>> GetVisits(int visitId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        await using var cmd = new SqlCommand("Select * FROM [Product] WHERE IdProduct = @productId", con);
+        string sql = @"SELECT s.name, s.base_fee, vs.service_fee
+                        FROM Visit v
+                        JOIN Visit_Service vs ON vs.visit_id = vs.visit_id
+                        JOIN [Service] s ON s.service_id = vs.service_id
+                        WHERE v.visit_id = @visitId";
+        await using var cmd = new SqlCommand(sql, con);
 
-        cmd.Parameters.AddWithValue("@productId", productId);
+        cmd.Parameters.AddWithValue("@visitId", visitId);
 
         await con.OpenAsync();
         SqlDataReader reader = await cmd.ExecuteReaderAsync();
-        await reader.ReadAsync();
-       
-        return new Product()
+        List<VisitServiceDTO> services = new List<VisitServiceDTO>();
+        while (await reader.ReadAsync())
         {
-            IdProduct = (int)reader["IdProduct"],
-            Name = (string)reader["Name"],
-            Description = (string)reader["Description"],
-            Price = (decimal)reader["Price"]
-        };
+            VisitServiceDTO service = new VisitServiceDTO()
+            {
+                ServiceName = (string)reader["name"],
+                ServiceFee = (decimal)reader["base_fee"] + (decimal)reader["service_fee"]
+            };
+            services.Add(service);
+        }
+        return services;
     }
     //Transactional method
+    //ToRemove
     public async Task FulfillOrderAtCurrentDate(int orderId)
     {
         await using var cmd = new SqlCommand("UPDATE [Order] SET FulfilledAt = GETDATE() WHERE IdOrder = @orderId", TransConnection);
@@ -74,6 +90,8 @@ public class WarehouseRepository: TransactionalRepository, IWarehouseRepository
         }
 
     }
+    //Scalar
+    //ToRemove
     public async Task<int> AddProduct_WarehouseRecord(int warehouseId, int productId, int orderId, int amount, decimal price)
     {
         await using var insComm = new SqlCommand(@"INSERT INTO [Product_Warehouse] VALUES (@warehouseId, @productId, @orderId, @amount, @price, GETDATE()); SELECT SCOPE_IDENTITY()", TransConnection);

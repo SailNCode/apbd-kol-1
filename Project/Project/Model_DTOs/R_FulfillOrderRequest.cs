@@ -2,7 +2,8 @@
 
 namespace Tutorial9.Model_DTOs;
 
-public class FulfillOrderRequest
+//ToRemove
+public class R_FulfillOrderRequest
 {
     [Required]
     public int IdProduct { set; get; }

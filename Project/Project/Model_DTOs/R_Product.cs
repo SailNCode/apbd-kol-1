@@ -1,6 +1,7 @@
 ﻿namespace Tutorial9.Model_DTOs;
 
-public class Product
+//ToRemove
+public class R_Product
 {
     public int IdProduct { get; set; }
     public string Name { get; set; }

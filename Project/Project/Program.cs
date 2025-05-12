@@ -8,9 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-builder.Services.AddScoped<TransactionalRepository>();
-builder.Services.AddScoped<IWarehouseService, WarehouseService>();
-builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+//builder.Services.AddScoped<TransactionalRepository>();
+builder.Services.AddScoped<IService, Service>();
+builder.Services.AddScoped<IRepository, Repository>();
 
 
 var app = builder.Build();
