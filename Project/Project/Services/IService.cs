@@ -1,9 +1,10 @@
 ﻿using Tutorial9.Model_DTOs;
+using Tutorial9.Model_DTOs.post;
 
 namespace Tutorial9.Services;
 
 public interface IService
 {
-    //ToRemove
-    Task<int> FulfillOrderRequest(R_FulfillOrderRequest rFulfillRequest);
+    Task<VisitInfo> GetVisitInfo(int visitId);
+    Task AddVisit(VisitPost visitPost);
 }

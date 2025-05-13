@@ -4,14 +4,14 @@ namespace Tutorial9.Repositories;
 
 public interface IRepository: ITransactional
 {
-    //ToRemove
-    Task FulfillOrderAtCurrentDate(int orderId);
-    //ToRemove
-    Task<int> AddProduct_WarehouseRecord(int warehouseId, int productId, int orderId, int amount, decimal price);
-    //ToRemove
-    Task<bool> IsVisitPresent(int visitId);
-    //ToRemove
-    Task<ClientDTO> GetClient(int visitClientId);
-    //ToRemove
-    Task<List<VisitServiceDTO>> GetVisits(int visitId);
+    Task<Client> GetClient(int clientId);
+
+    Task<Visit> GetVisit(int visitId);
+    Task<Mechanic> GetMechanic(int mechanicId);
+    Task<Mechanic> GetMechanic(string mechanicLicenceNumber);
+
+    Task<List<VisitService>> GetVisitServices(int visitId);
+    Task<Service> getService(string serviceServiceName);
+    Task AddVisit(int visitPostVisitId, int visitPostClientId, int mechanicMechanicId);
+    Task AddVisitServices(List<VisitService> services);
 }

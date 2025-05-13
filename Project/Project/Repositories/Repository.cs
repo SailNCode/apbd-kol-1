@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Tutorial9.Model_DTOs;
 using Tutorial9.Exceptions;
 using Tutorial9.Services;
+using Service = Tutorial9.Model_DTOs.Service;
 
 namespace Tutorial9.Repositories;
 
@@ -10,25 +11,34 @@ public class Repository: TransactionalRepository, IRepository
 {
 
     public Repository(IConfiguration configuration): base(configuration) {}
-    //Is present
-    //ToRemove
-    public async Task<bool> IsVisitPresent(int visitId)
+
+    public async Task<Visit> GetVisit(int visitId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        await using var cmd = new SqlCommand("Select 1 FROM [Visit] WHERE visit_id = @visitId", con);
+        await using var cmd = new SqlCommand("SELECT * FROM [Visit] WHERE visit_id = @visitId", con);
 
         cmd.Parameters.AddWithValue("@visitId", visitId);
 
         await con.OpenAsync();
         SqlDataReader reader = await cmd.ExecuteReaderAsync();
-        return await reader.ReadAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new Visit()
+            {
+                VisitId = (int) reader["visit_id"],
+                ClientId = (int) reader["client_id"],
+                MechanicId = (int) reader["mechanic_id"],
+                Date = (DateTime) reader["date"],
+            };
+        }
+
+        throw new NotFoundException("Visit with such id doesn't exist");
     }
-    //Get object
-    //ToRemove
-    public async Task<ClientDTO> GetClient(int clientId)
+    public async Task<Client> GetClient(int clientId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        await using var cmd = new SqlCommand("SELECT * FROM [ClientA] WHERE client_id = @clientId", con);
+        await using var cmd = new SqlCommand("SELECT * FROM [Client] WHERE client_id = @clientId", con);
 
         cmd.Parameters.AddWithValue("@clientId", clientId);
 
@@ -37,24 +47,47 @@ public class Repository: TransactionalRepository, IRepository
 
         if (await reader.ReadAsync())
         {
-            return new ClientDTO
+            return new Client
             {
+                ClientId = (int) reader["client_id"],
                 FirstName = reader["first_name"].ToString(),
                 LastName = reader["last_name"].ToString(),
-                DateOfBirth = (DateTime) reader["date_of_birth"]
+                BirthDate = (DateTime) reader["date_of_birth"]
             };
         }
 
         throw new NotFoundException("Client with such id doesn't exist");
     }
-    //Get list
-    //ToRemove
-    public async Task<List<VisitServiceDTO>> GetVisits(int visitId)
+    public async Task<Mechanic> GetMechanic(int mechanicId)
     {
         await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
-        string sql = @"SELECT s.name, s.base_fee, vs.service_fee
+        await using var cmd = new SqlCommand("SELECT * FROM [Mechanic] WHERE mechanic_id = @mechanicId", con);
+
+        cmd.Parameters.AddWithValue("@mechanicId", mechanicId);
+
+        await con.OpenAsync();
+        SqlDataReader reader = await cmd.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new Mechanic
+            {
+                MechanicID = (int) reader["mechanic_id"],
+                FirstName = reader["first_name"].ToString(),
+                LastName = reader["last_name"].ToString(),
+                LicenceNumber = reader["licence_number"].ToString()
+            };
+        }
+
+        throw new NotFoundException("Mechanic with such id doesn't exist");
+    }
+
+    public async Task<List<VisitService>> GetVisitServices(int visitId)
+    {
+        await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
+        string sql = @"SELECT v.visit_id, s.name, s.service_id, vs.service_fee
                         FROM Visit v
-                        JOIN Visit_Service vs ON vs.visit_id = vs.visit_id
+                        JOIN Visit_Service vs ON vs.visit_id = v.visit_id
                         JOIN [Service] s ON s.service_id = vs.service_id
                         WHERE v.visit_id = @visitId";
         await using var cmd = new SqlCommand(sql, con);
@@ -63,50 +96,97 @@ public class Repository: TransactionalRepository, IRepository
 
         await con.OpenAsync();
         SqlDataReader reader = await cmd.ExecuteReaderAsync();
-        List<VisitServiceDTO> services = new List<VisitServiceDTO>();
+        List<VisitService> services = new List<VisitService>();
         while (await reader.ReadAsync())
         {
-            VisitServiceDTO service = new VisitServiceDTO()
+            VisitService service = new VisitService()
             {
+                VisitId = visitId,
+                ServiceId = (int) reader["service_id"],
                 ServiceName = (string)reader["name"],
-                ServiceFee = (decimal)reader["base_fee"] + (decimal)reader["service_fee"]
+                ServiceFee = (decimal)reader["service_fee"]
             };
             services.Add(service);
         }
         return services;
     }
-    //Transactional method
-    //ToRemove
-    public async Task FulfillOrderAtCurrentDate(int orderId)
-    {
-        await using var cmd = new SqlCommand("UPDATE [Order] SET FulfilledAt = GETDATE() WHERE IdOrder = @orderId", TransConnection);
-        cmd.Transaction = Transaction as SqlTransaction;
-        cmd.Parameters.AddWithValue("@orderId", orderId);
 
-        int nModified = await cmd.ExecuteNonQueryAsync();
-        if (nModified != 1)
+    public async Task<Mechanic> GetMechanic(string mechanicLicenceNumber)
+    {
+        await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using var cmd = new SqlCommand("SELECT * FROM [Mechanic] WHERE licence_number = @mechanicLicenceNumber", con);
+
+        cmd.Parameters.AddWithValue("@mechanicLicenceNumber", mechanicLicenceNumber);
+
+        await con.OpenAsync();
+        SqlDataReader reader = await cmd.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
         {
-            throw new InternalServerException("'FulfilledAt' date hasn't been added");
+            return new Mechanic
+            {
+                MechanicID = (int) reader["mechanic_id"],
+                FirstName = reader["first_name"].ToString(),
+                LastName = reader["last_name"].ToString(),
+                LicenceNumber = reader["licence_number"].ToString()
+            };
         }
 
+        throw new NotFoundException("Mechanic with such licence number doesn't exist");
     }
-    //Scalar
-    //ToRemove
-    public async Task<int> AddProduct_WarehouseRecord(int warehouseId, int productId, int orderId, int amount, decimal price)
+    public async Task<Service> getService(string serviceServiceName)
     {
-        await using var insComm = new SqlCommand(@"INSERT INTO [Product_Warehouse] VALUES (@warehouseId, @productId, @orderId, @amount, @price, GETDATE()); SELECT SCOPE_IDENTITY()", TransConnection);
+        await using var con = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using var cmd = new SqlCommand("SELECT * FROM [Service] WHERE name = @serviceServiceName", con);
+
+        cmd.Parameters.AddWithValue("@serviceServiceName", serviceServiceName);
+
+        await con.OpenAsync();
+        SqlDataReader reader = await cmd.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return new Service()
+            {
+                ServiceId = (int)reader["service_id"],
+                Name = (string)reader["name"],
+                BaseFee = (decimal)reader["base_fee"]
+            };
+        }
+
+        throw new NotFoundException("Service with name " + serviceServiceName + " does not exist");
+    }
+
+    public async Task AddVisit(int visitPostVisitId, int visitPostClientId, int mechanicMechanicId)
+    {
+        await using var insComm = new SqlCommand(@"INSERT INTO [Visit] VALUES (@visitId, @clientId, @mechanicId, GETDATE())", TransConnection);
         insComm.Transaction = Transaction as SqlTransaction;
-        insComm.Parameters.AddWithValue("@warehouseId", warehouseId);
-        insComm.Parameters.AddWithValue("@productId", productId);
-        insComm.Parameters.AddWithValue("@orderId", orderId);
-        insComm.Parameters.AddWithValue("@amount", amount);
-        insComm.Parameters.AddWithValue("@price", price);
+        insComm.Parameters.AddWithValue("@visitId", visitPostVisitId);
+        insComm.Parameters.AddWithValue("@clientId", visitPostClientId);
+        insComm.Parameters.AddWithValue("@mechanicId", mechanicMechanicId);
         
-        var result = await insComm.ExecuteScalarAsync();
+        int nModified = await insComm.ExecuteNonQueryAsync();
+        if (nModified != 1)
+        {
+            throw new InternalServerException("Visit wasn't added");
+        }
+    }
 
-        if (result == DBNull.Value)
-            throw new InternalServerException("'Product_Warehouse' identity not returned");
-
-        return Convert.ToInt32(result);
+    public async Task AddVisitServices(List<VisitService> services)
+    {
+        foreach (var service in services)
+        {
+            await using var insComm = new SqlCommand(@"INSERT INTO [Visit_Service] VALUES (@visitId, @serviceId, @serviceFee)", TransConnection);
+            insComm.Transaction = Transaction as SqlTransaction;
+            insComm.Parameters.AddWithValue("@visitId", service.VisitId);
+            insComm.Parameters.AddWithValue("@serviceId", service.ServiceId);
+            insComm.Parameters.AddWithValue("@serviceFee", service.ServiceFee);
+        
+            int nModified = await insComm.ExecuteNonQueryAsync();
+            if (nModified != 1)
+            {
+                throw new InternalServerException("Visit wasn't added");
+            }
+        }
+        
     }
 }
